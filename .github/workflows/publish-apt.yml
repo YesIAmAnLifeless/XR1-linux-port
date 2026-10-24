@@ -26,6 +26,7 @@ jobs:
     steps:
       - name: Install repository tools
         run: |
+          set -eu
           sudo apt-get update
           sudo apt-get install -y dpkg-dev apt-utils gnupg
 
@@ -38,7 +39,7 @@ jobs:
           test -n "$APT_SIGNING_KEY"
           printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import
 
-          gpg --list-secret-keys \
+          gpg --batch --list-secret-keys \
             3D716D8D1075FC96E58960E32228113FB65117F4
 
       - name: Download XR1 package
@@ -53,26 +54,41 @@ jobs:
 
           dpkg-deb --info site/pool/xr1-wine_1.0.1-1.deb
 
+          PACKAGE_NAME="$(dpkg-deb -f site/pool/xr1-wine_1.0.1-1.deb Package)"
+          PACKAGE_VERSION="$(dpkg-deb -f site/pool/xr1-wine_1.0.1-1.deb Version)"
+          PACKAGE_ARCH="$(dpkg-deb -f site/pool/xr1-wine_1.0.1-1.deb Architecture)"
+
+          test "$PACKAGE_NAME" = "xr1-wine"
+          test "$PACKAGE_VERSION" = "1.0.1-1"
+          test "$PACKAGE_ARCH" = "all"
+
       - name: Generate package indexes
         run: |
           set -eu
 
           mkdir -p site/dists/stable/main/binary-all
 
-          cd site
+          # Scan from the site root so package paths are relative
+          # to the repository root, not prefixed with "site/".
+          dpkg-scanpackages \
+            site/pool \
+            /dev/null \
+            > site/dists/stable/main/binary-all/Packages
 
-          dpkg-scanpackages --arch all pool /dev/null \
-            > dists/stable/main/binary-all/Packages
+          if ! grep -q '^Package: xr1-wine$' \
+            site/dists/stable/main/binary-all/Packages; then
+            echo "ERROR: xr1-wine is missing from Packages."
+            cat site/dists/stable/main/binary-all/Packages
+            exit 1
+          fi
 
           gzip -9 -n -c \
-            dists/stable/main/binary-all/Packages \
-            > dists/stable/main/binary-all/Packages.gz
+            site/dists/stable/main/binary-all/Packages \
+            > site/dists/stable/main/binary-all/Packages.gz
 
-          test -s dists/stable/main/binary-all/Packages
-          grep -q '^Package: xr1-wine$' \
-            dists/stable/main/binary-all/Packages
-
-          cd ..
+          echo "Generated package index:"
+          grep -E '^(Package|Version|Architecture|Filename|Size|SHA256):' \
+            site/dists/stable/main/binary-all/Packages
 
       - name: Generate and sign repository metadata
         env:
@@ -110,7 +126,23 @@ jobs:
             > site/xr1-archive-keyring.gpg
 
           test -s site/dists/stable/InRelease
+          test -s site/dists/stable/Release.gpg
           test -s site/xr1-archive-keyring.gpg
+
+      - name: Verify signed repository metadata
+        env:
+          KEY_FPR: 3D716D8D1075FC96E58960E32228113FB65117F4
+        run: |
+          set -eu
+
+          gpg --batch --verify \
+            site/dists/stable/InRelease
+
+          gpg --batch --verify \
+            site/dists/stable/Release.gpg \
+            site/dists/stable/Release
+
+          echo "Repository metadata signatures verified."
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
