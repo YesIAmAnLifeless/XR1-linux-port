@@ -1,4 +1,4 @@
-
+```yaml
 name: Publish XR1 APT Repository
 
 on:
@@ -33,32 +33,55 @@ jobs:
         env:
           APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
         run: |
+          set -eu
+
           test -n "$APT_SIGNING_KEY"
           printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import
-          gpg --list-secret-keys
+
+          gpg --list-secret-keys \
+            3D716D8D1075FC96E58960E32228113FB65117F4
 
       - name: Download XR1 package
         run: |
+          set -eu
+
           mkdir -p site/pool
+
           curl --fail --location --silent --show-error \
             "https://github.com/YesIAmAnLifeless/XR1-linux-port/releases/download/v1.0.1/xr1-wine_1.0.1-1.deb" \
-            -o site/pool/xr1-wine_1.0.1-1.deb
+            --output site/pool/xr1-wine_1.0.1-1.deb
+
           dpkg-deb --info site/pool/xr1-wine_1.0.1-1.deb
 
       - name: Generate package indexes
         run: |
+          set -eu
+
           mkdir -p site/dists/stable/main/binary-all
-          dpkg-scanpackages --arch all site/pool /dev/null \
-            > site/dists/stable/main/binary-all/Packages
+
+          cd site
+
+          dpkg-scanpackages --arch all pool /dev/null \
+            > dists/stable/main/binary-all/Packages
+
           gzip -9 -n -c \
-            site/dists/stable/main/binary-all/Packages \
-            > site/dists/stable/main/binary-all/Packages.gz
+            dists/stable/main/binary-all/Packages \
+            > dists/stable/main/binary-all/Packages.gz
+
+          test -s dists/stable/main/binary-all/Packages
+          grep -q '^Package: xr1-wine$' \
+            dists/stable/main/binary-all/Packages
+
+          cd ..
 
       - name: Generate and sign repository metadata
         env:
           KEY_FPR: 3D716D8D1075FC96E58960E32228113FB65117F4
         run: |
-          apt-ftparchive release site/dists/stable > /tmp/release-fields
+          set -eu
+
+          apt-ftparchive release site/dists/stable \
+            > /tmp/release-fields
 
           {
             echo "Origin: XR1 Linux Port"
@@ -70,18 +93,24 @@ jobs:
             cat /tmp/release-fields
           } > site/dists/stable/Release
 
-          gpg --batch --yes --local-user "$KEY_FPR" \
+          gpg --batch --yes \
+            --local-user "$KEY_FPR" \
             --clearsign \
             --output site/dists/stable/InRelease \
             site/dists/stable/Release
 
-          gpg --batch --yes --armor --detach-sign \
+          gpg --batch --yes \
+            --armor \
+            --detach-sign \
             --local-user "$KEY_FPR" \
             --output site/dists/stable/Release.gpg \
             site/dists/stable/Release
 
           gpg --batch --export "$KEY_FPR" \
             > site/xr1-archive-keyring.gpg
+
+          test -s site/dists/stable/InRelease
+          test -s site/xr1-archive-keyring.gpg
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -94,4 +123,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
+```
