@@ -1,0 +1,37 @@
+# Maintainer: patateskibris
+pkgname=xr1-wine
+pkgver=1.0.1
+pkgrel=1
+pkgdesc="Unofficial Wine and HID proxy wrapper for Section XR1 mouse software"
+arch=('any')
+url="https://github.com/YesIAmAnLifeless/XR1-linux-port"
+license=('MIT' 'LicenseRef-proprietary')
+depends=('python' 'wine' 'polkit' 'rsync' 'bash' 'hicolor-icon-theme')
+makedepends=('innoextract')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz"
+        "Section_XR1.exe")
+sha256sums=('a5140bfa1426a4c629f7a52f71998b2e9a75a6e17d01361bc5fccaa7763b73eb'
+            '5899be89ab039963e69b20f77b5ceabb5568146819ceedd16bf87521c823bdae')
+
+prepare() {
+  innoextract -q -d "$srcdir/extract" "$srcdir/Section_XR1.exe"
+}
+
+package() {
+  cd "$srcdir/XR1-linux-port-$pkgver"
+  install -d "$pkgdir/usr/share/$pkgname"
+  cp -r "$srcdir/extract/app" "$pkgdir/usr/share/$pkgname/app"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/$pkgname/app"
+  rm -f "$pkgdir/usr/share/$pkgname/app/xr1.log"
+
+  install -Dm755 xr1proxy.py "$pkgdir/usr/lib/$pkgname/xr1proxy.py"
+  install -Dm755 fixperm.sh "$pkgdir/usr/lib/$pkgname/fixperm.sh"
+  install -Dm755 xr1-wine "$pkgdir/usr/bin/xr1-wine"
+  install -Dm644 xr1-proxy.service "$pkgdir/usr/lib/systemd/system/xr1-proxy.service"
+  install -Dm644 70-xr1.rules "$pkgdir/usr/lib/udev/rules.d/70-xr1.rules"
+  install -Dm644 xr1.conf "$pkgdir/usr/lib/modules-load.d/xr1.conf"
+  install -Dm644 xr1.desktop "$pkgdir/usr/share/applications/xr1.desktop"
+  install -Dm644 xr1.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/xr1.png"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  echo "The Section XR1 software under /usr/share/xr1-wine/app is proprietary and not covered by the MIT license of the wrapper files." > "$pkgdir/usr/share/licenses/$pkgname/LicenseRef-proprietary"
+}
