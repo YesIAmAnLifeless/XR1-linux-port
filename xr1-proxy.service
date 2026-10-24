@@ -1,0 +1,8 @@
+[Unit]
+Description=XR1 mouse HID proxy
+
+[Service]
+ExecStart=/usr/bin/python3 -u /usr/lib/xr1-wine/xr1proxy.py
+ExecStartPost=/usr/lib/xr1-wine/fixperm.sh
+Restart=on-failure
+RestartSec=3

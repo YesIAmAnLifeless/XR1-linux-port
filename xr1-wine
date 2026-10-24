@@ -1,0 +1,18 @@
+#!/bin/bash
+export WINEPREFIX="${XDG_DATA_HOME:-$HOME/.local/share}/xr1-wine"
+APPDIR="$WINEPREFIX/drive_c/XR1"
+SRC=/usr/share/xr1-wine/app
+
+[ -d "$WINEPREFIX" ] || wineboot -u
+
+mkdir -p "$APPDIR"
+# add anything missing (first run, or files new in a package update); never overwrite
+rsync -a --ignore-existing "$SRC/" "$APPDIR/"
+# programs and static assets are always refreshed
+rsync -a "$SRC/Gaming Mouse 3.0.exe" "$SRC"/*.dll "$APPDIR/"
+rsync -a --exclude='config/config.ini' --exclude='macro/macroGrp.ini' \
+      --exclude='config/constMacro.dat' "$SRC/skins/" "$APPDIR/skins/"
+
+pkexec systemctl start xr1-proxy.service || exit 1
+sleep 2
+cd "$APPDIR" && exec wine "Gaming Mouse 3.0.exe" "$@"

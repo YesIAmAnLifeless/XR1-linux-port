@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Section XR1 Mouse Software
+Exec=xr1-wine
+Icon=xr1
+Categories=Utility;Settings;

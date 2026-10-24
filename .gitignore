@@ -1,0 +1,6 @@
+*.exe
+app/
+tmp/
+*.pkg.tar.zst
+src/
+pkg/
